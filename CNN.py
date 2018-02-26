@@ -1,3 +1,26 @@
+#  Copyright 2016 The TensorFlow Authors. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+"""Convolutional Neural Network Estimator for MNIST, built with tf.layers."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import numpy as np
+import tensorflow as tf
+
+tf.logging.set_verbosity(tf.logging.INFO)
 import re
 import numpy
 import os
@@ -5,27 +28,21 @@ import tensorflow as tf
 from random import randint
 
 def read_pgm(filename, byteorder='>'):
-  """Return image data from a raw PGM file as a numpy array.
-
-  Format specification: http://netpbm.sourceforge.net/doc/pgm.html
-
-  """
-
   with open(filename, 'rb') as f:
     buffer = f.read()
   try:
     header, width, height, maxval = re.search(
-	b"(^P5\s(?:\s*#.*[\r\n])*"
-	b"(\d+)\s(?:\s*#.*[\r\n])*"
-	b"(\d+)\s(?:\s*#.*[\r\n])*"
-	b"(\d+)\s(?:\s*#.*[\r\n]\s)*)", buffer).groups()
+  b"(^P5\s(?:\s*#.*[\r\n])*"
+  b"(\d+)\s(?:\s*#.*[\r\n])*"
+  b"(\d+)\s(?:\s*#.*[\r\n])*"
+  b"(\d+)\s(?:\s*#.*[\r\n]\s)*)", buffer).groups()
   except AttributeError:
     raise ValueError("Not a raw PGM file: '%s'" % filename)
   return numpy.frombuffer(buffer,
-			   dtype='u1' if int(maxval) < 256 else byteorder+'u2',
-			   count=int(width)*int(height),
-			   offset=len(header)
-			  ).reshape((int(height)*int(width)))
+         dtype='u1' if int(maxval) < 256 else byteorder+'u2',
+         count=int(width)*int(height),
+         offset=len(header)
+        ).reshape((int(height)*int(width)))
 
 
 def import_images(image_dir, num_images):
@@ -39,7 +56,7 @@ def import_images(image_dir, num_images):
           i += 1
 
   # Create a tensor for the labels
-  labels_tensor = numpy.zeros((num_images, 7))
+  labels_tensor = numpy.zeros(num_images,dtype=np.int32)
   f = open("data.txt", 'r')
   for line in f:
 
@@ -53,129 +70,154 @@ def import_images(image_dir, num_images):
     # we are going to built a one-hot vector for each label,
     # using the abnormality of the mammogram
     if abnormality == "CALC":
-      labels_tensor[image_num] = numpy.array([(1,0,0,0,0,0,0)])
+      labels_tensor[image_num] = 1
     elif abnormality == "CIRC":
-      labels_tensor[image_num] = numpy.array([(0,1,0,0,0,0,0)])
+      labels_tensor[image_num] = 2
     elif abnormality == "SPIC":
-      labels_tensor[image_num] = numpy.array([(0,0,1,0,0,0,0)])
+      labels_tensor[image_num] = 3
     elif abnormality == "MISC":
-      labels_tensor[image_num] = numpy.array([(0,0,0,1,0,0,0)])
+      labels_tensor[image_num] = 4
     elif abnormality == "ARCH":
-      labels_tensor[image_num] = numpy.array([(0,0,0,0,1,0,0)])
+      labels_tensor[image_num] = 5
     elif abnormality == "ASYM":
-      labels_tensor[image_num] = numpy.array([(0,0,0,0,0,1,0)])
+      labels_tensor[image_num] = 6
     elif abnormality == "NORM":
-      labels_tensor[image_num] = numpy.array([(0,0,0,0,0,0,1)])
+      labels_tensor[image_num] = 7
 
   return images_tensor, labels_tensor
 
 
-def weight_variable(shape):
-  initial = tf.truncated_normal(shape, stddev=0.1)
-  return tf.Variable(initial)
+def cnn_model_fn(features, labels, mode):
+  """Model function for CNN."""
+  # Input Layer
+  # Reshape X to 4-D tensor: [batch_size, width, height, channels]
+  # MNIST images are 28x28 pixels, and have one color channel
+  input_layer = tf.reshape(features["x"], [-1, 1024, 1024, 1])
 
-def bias_variable(shape):
-  initial = tf.constant(0.1, shape=shape)
-  return tf.Variable(initial)
+  # Convolutional Layer #1
+  # Computes 32 features using a 5x5 filter with ReLU activation.
+  # Padding is added to preserve width and height.
+  # Input Tensor Shape: [batch_size, 28, 28, 1]
+  # Output Tensor Shape: [batch_size, 28, 28, 32]
+  conv1 = tf.layers.conv2d(
+      inputs=input_layer,
+      filters=32,
+      kernel_size=[5, 5],
+      padding=0,
+      activation=tf.nn.relu)
+  #print(conv1.shape)
 
-# Stride of 1 from MNIST
-def conv2d(x, W):
-  return tf.nn.conv2d(x, W, strides=[1,1,1,1], padding='SAME')
+  # Pooling Layer #1
+  # First max pooling layer with a 2x2 filter and stride of 2
+  # Input Tensor Shape: [batch_size, 28, 28, 32]
+  # Output Tensor Shape: [batch_size, 14, 14, 32]
+  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[8, 8], strides=8)
+  # Convolutional Layer #2
+  # Computes 64 features using a 5x5 filter.
+  # Padding is added to preserve width and height.
+  # Input Tensor Shape: [batch_size, 124, 124, 32]
+  # Output Tensor Shape: [batch_size, 12, 12, 28]
+  conv2 = tf.layers.conv2d(
+      inputs=pool1,
+      filters=28,
+      kernel_size=[4, 4],
+      padding=0,
+      activation=tf.nn.relu)
+  print(conv2.shape)
+  # Pooling Layer #2
+  # Second max pooling layer with a 2x2 filter and stride of 2
+  # Input Tensor Shape: [batch_size, 14, 14, 64]
+  # Output Tensor Shape: [batch_size, 7, 7, 64]
+  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[8, 8], strides=8)
+  # Flatten tensor into a batch of vectors
+  # Input Tensor Shape: [batch_size, 7, 7, 64]
+  # Output Tensor Shape: [batch_size, 7 * 7 * 64]
+  pool2_flat = tf.reshape(pool2, [-1, 12* 12* 28])
 
-# Pooling over 2x2 blocks, derived from MNIST
-def max_pool_2x2(x):
-  return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+  # Dense Layer
+  # Densely connected layer with 1024 neurons
+  # Input Tensor Shape: [batch_size, 7 * 7 * 64]
+  # Output Tensor Shape: [batch_size, 1024]
+  dense = tf.layers.dense(inputs=pool2_flat, units=24, activation=tf.nn.relu)
 
+  # Add dropout operation; 0.6 probability that element will be kept
+  dropout = tf.layers.dropout(
+      inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+
+  # Logits layer
+  # Input Tensor Shape: [batch_size, 1024]
+  # Output Tensor Shape: [batch_size, 10]
+  logits = tf.layers.dense(inputs=dropout, units=10)
+
+  predictions = {
+      # Generate predictions (for PREDICT and EVAL mode)
+      "classes": tf.argmax(input=logits, axis=1),
+      # Add `softmax_tensor` to the graph. It is used for PREDICT and by the
+      # `logging_hook`.
+      "probabilities": tf.nn.softmax(logits, name="softmax_tensor")
+  }
+  if mode == tf.estimator.ModeKeys.PREDICT:
+    return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+
+  # Calculate Loss (for both TRAIN and EVAL modes)
+  loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
+
+  # Configure the Training Op (for TRAIN mode)
+  if mode == tf.estimator.ModeKeys.TRAIN:
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+    train_op = optimizer.minimize(
+        loss=loss,
+        global_step=tf.train.get_global_step())
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+
+  # Add evaluation metrics (for EVAL mode)
+  eval_metric_ops = {
+      "accuracy": tf.metrics.accuracy(
+          labels=labels, predictions=predictions["classes"])}
+  return tf.estimator.EstimatorSpec(
+      mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+
+
+def main(unused_argv):
+  # Load training and eval data
+  #mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+  
+  train_data  , train_labels = import_images("./images/", 322)
+
+  eval_data , eval_labels = train_data  , train_labels
+  mnist_classifier = tf.estimator.Estimator(
+      model_fn=cnn_model_fn, model_dir="/tmp/breast_cancer")
+
+  # Set up logging for predictions
+  # Log the values in the "Softmax" tensor with label "probabilities"
+  tensors_to_log = {"probabilities": "softmax_tensor"}
+  logging_hook = tf.train.LoggingTensorHook(
+      tensors=tensors_to_log, every_n_iter=50)
+
+  # Train the model
+  train_input_fn = tf.estimator.inputs.numpy_input_fn(
+      x={"x": train_data.astype(np.float32)},
+      y=train_labels.astype(np.int32),
+      batch_size=10,
+      num_epochs=None,
+      shuffle=True)
+  mnist_classifier.train(
+      input_fn=train_input_fn,
+      steps=10,
+      hooks=[logging_hook])
+
+  # Evaluate the model and print results
+  eval_input_fn = tf.estimator.inputs.numpy_input_fn(
+      x={"x": eval_data.astype(np.float32)},
+      y=eval_labels.astype(np.int32),
+      num_epochs=1,
+      shuffle=False)
+  eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
+  print(eval_results)
 
 if __name__ == "__main__":
+  tf.app.run()
 
-  # Import the data into numpy vectors
-  images_train, labels_train = import_images("images/", 322)
 
-  # Set up the model variables
-  sess = tf.InteractiveSession()
+#(55000, 784) (55000,)
 
-  x = tf.placeholder(tf.float32, shape=[None, 1024*1024])
-  y_ = tf.placeholder(tf.float32, shape=[None, 7])
-
-  #First Convolutional Layer
-  W_conv1 = weight_variable([5,5,1,32])
-  b_conv1 = bias_variable([32])
-
-  x_image = tf.reshape(x, [-1, 1024, 1024, 1])
-
-  h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
-  h_pool1 = max_pool_2x2(h_conv1)
-
-  #Second Convolutional Layer
-  W_conv2 = weight_variable([5, 5, 32, 64])
-  b_conv2 = bias_variable([64])
-
-  h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-  h_pool2 = max_pool_2x2(h_conv2)
-
-  # Densely connected layer
-  # By going through two 2x2 poolings, we have reduced the
-  # the image from 1024x1024 to 512x512 and then to 256x256
-  # http://stackoverflow.com/questions/36987641/how-image-is-reduced-to-7x7-by-tensorflow
-  W_fc1 = weight_variable([256*256*64, 256])
-  b_fc1 = bias_variable([256])
-
-  h_pool2_flat = tf.reshape(h_pool2, [-1, 256*256*64])
-  h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-
-  # Dropout
-  keep_prob = tf.placeholder(tf.float32)
-  h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
-
-  # Readout Layer
-  W_fc2 = weight_variable([256, 7])
-  b_fc2 = bias_variable([7])
-
-  y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
-
-  cross_entropy = tf.reduce_mean(
-		tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
-  
-  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-
-  correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
-  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-  sess.run(tf.initialize_all_variables())
-
-  # Set up Eval batch
-  print('Allocating eval batches ...')
-  test_xs = numpy.zeros((31, 1024*1024))
-  test_ys = numpy.zeros((31, 7))
-  for i in range(31):
-    test_xs[i] = images_train[i]
-    test_ys[i] = labels_train[i]
-
-  # Train
-  batch_xs = numpy.zeros((10,1024*1024))
-  batch_ys = numpy.zeros((10,7))
-
-  print('Beginning Model Training ...')
-
-  # 20 training steps, using 10 images each
-  for i in range(30):
-    #Create a batch of random images for training
-    for j in range(10):
-      k = randint(32,321)
-      batch_xs[j] = images_train[k]
-      batch_ys[j] = labels_train[k]
-
-    # Run the eval batch through the model and see how we're doing
-    if i%10 == 0:
-      train_accuracy = accuracy.eval(feed_dict={x: test_xs, y_: test_ys, keep_prob:1.0})
-      print("step %d, accuracy: %g"%(i, train_accuracy))
-
-    train_step.run(feed_dict={x: batch_xs, y_: batch_ys, keep_prob: 0.5})
-
-  #Clear out batch sets to save memory
-  batch_xs = batch_ys = []
-
-  print('Running Model Evaluation ...')
-
-  print(accuracy.eval(feed_dict={x: test_xs, y_: test_ys, keep_prob:1.0}))
