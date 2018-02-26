@@ -105,14 +105,16 @@ def cnn_model_fn(features, labels, mode):
       kernel_size=[5, 5],
       padding="same",
       activation=tf.nn.relu)
-  print(conv1.shape)
+  #print(conv1.shape) #(10, 1024, 1024, 32)
 
   # Pooling Layer #1
   # First max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 28, 28, 32]
   # Output Tensor Shape: [batch_size, 14, 14, 32]
   pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[8, 8], strides=8)
-  print(pool1.shape)
+  #print(pool1.shape)
+  #(10, 128, 128, 32)
+
   # Convolutional Layer #2
   # Computes 64 features using a 5x5 filter.
   # Padding is added to preserve width and height.
@@ -124,17 +126,22 @@ def cnn_model_fn(features, labels, mode):
       kernel_size=[11, 11],
       padding="same",
       activation=tf.nn.relu)
-  print(conv2.shape)
+  #print(conv2.shape)
+  #(10, 128, 128, 64)
+
+
   # Pooling Layer #2
   # Second max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 14, 14, 64]
   # Output Tensor Shape: [batch_size, 7, 7, 64]
   pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[8, 8], strides=8)
-  print(pool2.shape)
+  #print(pool2.shape)
+  #(10, 16, 16, 64)
+
   # Flatten tensor into a batch of vectors
   # Input Tensor Shape: [batch_size, 7, 7, 64]
   # Output Tensor Shape: [batch_size, 7 * 7 * 64]
-  pool2_flat = tf.reshape(pool2, [-1, 256 * 256 * 64])
+  pool2_flat = tf.reshape(pool2, [-1, 16 * 16 * 64])
 
   # Dense Layer
   # Densely connected layer with 1024 neurons
@@ -212,6 +219,7 @@ def main(unused_argv):
   eval_input_fn = tf.estimator.inputs.numpy_input_fn(
       x={"x": eval_data.astype(np.float32)},
       y=eval_labels.astype(np.int32),
+      batch_size=5,
       num_epochs=1,
       shuffle=False)
   eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
@@ -223,3 +231,9 @@ if __name__ == "__main__":
 
 #(55000, 784) (55000,)
 
+'''
+
+
+
+
+'''
