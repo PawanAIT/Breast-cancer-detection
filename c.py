@@ -16,7 +16,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import sys
 import numpy as np
 import tensorflow as tf
 
@@ -93,7 +93,7 @@ def cnn_model_fn(features, labels, mode):
   # Reshape X to 4-D tensor: [batch_size, width, height, channels]
   # MNIST images are 28x28 pixels, and have one color channel
   input_layer = tf.reshape(features["x"], [-1, 1024, 1024, 1])
-
+  print(input_layer.shape)
   # Convolutional Layer #1
   # Computes 32 features using a 5x5 filter with ReLU activation.
   # Padding is added to preserve width and height.
@@ -102,18 +102,19 @@ def cnn_model_fn(features, labels, mode):
   conv1 = tf.layers.conv2d(
       inputs=input_layer,
       filters=32,
-      kernel_size=[5, 5],
+      kernel_size=[21, 21],
       padding="same",
       activation=tf.nn.relu)
-  #print(conv1.shape) #(10, 1024, 1024, 32)
+  print(conv1.shape) #(10, 1024, 1024, 32)
 
   # Pooling Layer #1
   # First max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 28, 28, 32]
-  # Output Tensor Shape: [batch_size, 14, 14, 32]
-  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[8, 8], strides=8)
-  #print(pool1.shape)
-  #(10, 128, 128, 32)
+  # Output Tensor Shape: [batch_size, 14, 14, 3]
+  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[8, 8], strides = 4)
+  print(pool1.shape)
+  #(10  , 255 , 255 , 32)
+  
 
   # Convolutional Layer #2
   # Computes 64 features using a 5x5 filter.
@@ -126,7 +127,7 @@ def cnn_model_fn(features, labels, mode):
       kernel_size=[11, 11],
       padding="same",
       activation=tf.nn.relu)
-  #print(conv2.shape)
+  print(conv2.shape)
   #(10, 128, 128, 64)
 
 
@@ -134,15 +135,17 @@ def cnn_model_fn(features, labels, mode):
   # Second max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 14, 14, 64]
   # Output Tensor Shape: [batch_size, 7, 7, 64]
-  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[8, 8], strides=8)
-  #print(pool2.shape)
+  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[4, 4], strides = 4)
+  print(pool2.shape)
+  #sys.exit()
   #(10, 16, 16, 64)
 
   # Flatten tensor into a batch of vectors
   # Input Tensor Shape: [batch_size, 7, 7, 64]
   # Output Tensor Shape: [batch_size, 7 * 7 * 64]
-  pool2_flat = tf.reshape(pool2, [-1, 16 * 16 * 64])
-
+  pool2_flat = tf.reshape(pool2, [-1,63 * 63* 64])
+  print(pool2.shape)
+  
   # Dense Layer
   # Densely connected layer with 1024 neurons
   # Input Tensor Shape: [batch_size, 7 * 7 * 64]
