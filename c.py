@@ -70,19 +70,19 @@ def import_images(image_dir, num_images):
     # we are going to built a one-hot vector for each label,
     # using the abnormality of the mammogram
     if abnormality == "CALC":
-      labels_tensor[image_num] = 1
+      labels_tensor[image_num] = 0
     elif abnormality == "CIRC":
-      labels_tensor[image_num] = 2
+      labels_tensor[image_num] = 1
     elif abnormality == "SPIC":
-      labels_tensor[image_num] = 3
+      labels_tensor[image_num] = 2
     elif abnormality == "MISC":
-      labels_tensor[image_num] = 4
+      labels_tensor[image_num] = 3
     elif abnormality == "ARCH":
-      labels_tensor[image_num] = 5
+      labels_tensor[image_num] = 4
     elif abnormality == "ASYM":
-      labels_tensor[image_num] = 6
+      labels_tensor[image_num] = 5
     elif abnormality == "NORM":
-      labels_tensor[image_num] = 7
+      labels_tensor[image_num] = 6
 
   return images_tensor, labels_tensor
 
@@ -156,7 +156,7 @@ def cnn_model_fn(features, labels, mode):
   # Logits layer
   # Input Tensor Shape: [batch_size, 1024]
   # Output Tensor Shape: [batch_size, 10]
-  logits = tf.layers.dense(inputs=dropout, units=10)
+  logits = tf.layers.dense(inputs=dropout, units=7)
 
   predictions = {
       # Generate predictions (for PREDICT and EVAL mode)
@@ -195,7 +195,7 @@ def main(unused_argv):
 
   eval_data , eval_labels = train_data  , train_labels
   mnist_classifier = tf.estimator.Estimator(
-      model_fn=cnn_model_fn, model_dir="/tmp/breast_cancer")
+      model_fn=cnn_model_fn, model_dir="./saved_model")
 
   # Set up logging for predictions
   # Log the values in the "Softmax" tensor with label "probabilities"
